@@ -1,2 +1,3 @@
-# node-fs-watcher-go
-node-fs-watcher binding
+# fs-watcher-go
+
+[fs-watcher](https://github.com/Akumzy/fs-watcher) Go

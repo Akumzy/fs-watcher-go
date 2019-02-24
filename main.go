@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -35,7 +36,7 @@ type Config struct {
 	Filters           []watcher.Op `json:"filters"`
 	IgnoreHiddenFiles bool         `json:"ignoreHiddenFiles"`
 	IgnoreFiles       []string     `json:"ignoreFiles"`
-	Duration          int64        `json:"duration"`
+	Interval          int64        `json:"interval"`
 	Path              string       `json:"path"`
 	Recursive         bool         `json:"recursive"`
 }
@@ -58,12 +59,85 @@ func main() {
 				time.Sleep(time.Second)
 				os.Exit(1)
 			} else {
-				startWatching(func(watchedFiles []fileInfo) {
-					log.Println(watchedFiles)
+				go startWatching(func(watchedFiles []fileInfo) {
 					ioIPC.Reply(channel, watchedFiles, nil)
 				})
 			}
 		})
+		// Add Recursively
+		ioIPC.OnReceiveAndReply("app:addRecursive", func(channel string, data interface{}) {
+			path := data.(string)
+
+			if path != "" {
+				if err := w.AddRecursive(path); err != nil {
+					log.Println(err)
+					ioIPC.Reply(channel, nil, err)
+				} else {
+					ioIPC.Reply(channel, true, nil)
+				}
+
+			}
+		})
+		// add
+		ioIPC.OnReceiveAndReply("app:add", func(channel string, data interface{}) {
+			path := data.(string)
+			if path != "" {
+				if err := w.Add(path); err != nil {
+					ioIPC.Reply(channel, nil, err)
+				} else {
+					ioIPC.Reply(channel, true, nil)
+				}
+
+			}
+		})
+		// remove
+		ioIPC.OnReceiveAndReply("app:remove", func(channel string, data interface{}) {
+			path := data.(string)
+			if path != "" {
+				if err := w.Remove(path); err != nil {
+					ioIPC.Reply(channel, nil, err)
+				} else {
+					ioIPC.Reply(channel, true, nil)
+				}
+
+			}
+		})
+
+		// removeRecursive
+		ioIPC.OnReceiveAndReply("app:removeRecursive", func(channel string, data interface{}) {
+			path := data.(string)
+			if path != "" {
+				if err := w.RemoveRecursive(path); err != nil {
+					ioIPC.Reply(channel, nil, err)
+				} else {
+					ioIPC.Reply(channel, true, nil)
+				}
+
+			}
+		})
+		// ignore
+		ioIPC.OnReceiveAndReply("app:ignore", func(channel string, data interface{}) {
+			text := data.(string)
+			var paths []string
+			if err := json.Unmarshal([]byte(text), &paths); err != nil {
+				ioIPC.Reply(channel, false, err)
+
+			}
+			if len(paths) > 0 {
+				if err := w.Ignore(paths...); err != nil {
+					ioIPC.Reply(channel, false, err)
+				} else {
+					ioIPC.Reply(channel, true, nil)
+				}
+
+			}
+		})
+		// app:getWatchedFiles
+		ioIPC.OnReceiveAndReply("app:app:getWatchedFiles", func(channel string, data interface{}) {
+			files := getWatchedFiles()
+			ioIPC.Reply(channel, files, nil)
+		})
+
 	}()
 	ioIPC.Start()
 }
@@ -77,77 +151,16 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 	}
 	if config.Path != "" {
 		if config.Recursive {
-			w.AddRecursive(config.Path)
+			if err := w.AddRecursive(config.Path); err != nil {
+				reportError(err, true)
+			}
 		} else {
-			w.Add(config.Path)
+			if err := w.Add(config.Path); err != nil {
+				reportError(err, true)
+			}
 		}
 	}
-	// Add Recursively
-	ioIPC.OnReceiveAndReply("app:addRecursive", func(channel string, data interface{}) {
-		path := data.(string)
-		if path != "" {
-			if err := w.AddRecursive(path); err != nil {
-				ioIPC.Reply(channel, nil, err)
-			} else {
-				ioIPC.Reply(channel, true, nil)
-			}
 
-		}
-	})
-	// add
-	ioIPC.OnReceiveAndReply("app:add", func(channel string, data interface{}) {
-		path := data.(string)
-		if path != "" {
-			if err := w.Add(path); err != nil {
-				ioIPC.Reply(channel, nil, err)
-			} else {
-				ioIPC.Reply(channel, true, nil)
-			}
-
-		}
-	})
-	// remove
-	ioIPC.OnReceiveAndReply("app:remove", func(channel string, data interface{}) {
-		path := data.(string)
-		if path != "" {
-			if err := w.Remove(path); err != nil {
-				ioIPC.Reply(channel, nil, err)
-			} else {
-				ioIPC.Reply(channel, true, nil)
-			}
-
-		}
-	})
-
-	// removeRecursive
-	ioIPC.OnReceiveAndReply("app:removeRecursive", func(channel string, data interface{}) {
-		path := data.(string)
-		if path != "" {
-			if err := w.RemoveRecursive(path); err != nil {
-				ioIPC.Reply(channel, nil, err)
-			} else {
-				ioIPC.Reply(channel, true, nil)
-			}
-
-		}
-	})
-	// ignore
-	ioIPC.OnReceiveAndReply("app:ignore", func(channel string, data interface{}) {
-		text := data.(string)
-		var paths []string
-		if err := json.Unmarshal([]byte(text), &paths); err != nil {
-			ioIPC.Reply(channel, false, err)
-
-		}
-		if len(paths) > 0 {
-			if err := w.Ignore(paths...); err != nil {
-				ioIPC.Reply(channel, false, err)
-			} else {
-				ioIPC.Reply(channel, true, nil)
-			}
-
-		}
-	})
 	go func() {
 		for {
 			select {
@@ -161,17 +174,18 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 					Name:    event.Name(),
 					ModTime: event.ModTime(),
 					Mode:    event.Mode(), IsDir: event.IsDir()}
-				switch event.Op {
-				case watcher.Rename:
-				case watcher.Remove:
-				case watcher.Move:
+				switch {
+				case watcher.Rename == event.Op || watcher.Move == event.Op:
 					newPath, oldPath := getOldAndNewPath(event.Path)
 					file.Path = newPath
 					file.OldPath = oldPath
+					file.Name = path.Base(newPath)
 				}
 				ioIPC.Send("app:change", eventInfo{Event: event.Op, FileInfo: file})
+				log.Printf("%+v", event)
 			case err := <-w.Error:
 				ioIPC.Send("app:error", err)
+				log.Println(err)
 				time.Sleep(time.Second)
 				os.Exit(1)
 			case <-w.Closed:
@@ -179,6 +193,28 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 			}
 		}
 	}()
+	files := getWatchedFiles()
+	onReady(files)
+	if err := w.Start(time.Millisecond * time.Duration(config.Interval)); err != nil {
+
+		reportError(err, true)
+	}
+}
+func getOldAndNewPath(str string) (path, oldPath string) {
+	o := strings.Split(str, "->")
+	path = strings.TrimSpace(o[1])
+	oldPath = strings.TrimSpace(o[0])
+	return
+}
+func reportError(err error, exit bool) {
+	log.Println(err)
+	ioIPC.Send("app:error", err)
+	if exit {
+		os.Exit(1)
+	}
+}
+
+func getWatchedFiles() []fileInfo {
 	var files []fileInfo
 	for key, file := range w.WatchedFiles() {
 		item := fileInfo{
@@ -189,14 +225,5 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 			Mode:    file.Mode(), IsDir: file.IsDir()}
 		files = append(files, item)
 	}
-	onReady(files)
-	if err := w.Start(time.Millisecond * time.Duration(config.Duration)); err != nil {
-		ioIPC.Send("app:error", err)
-	}
-}
-func getOldAndNewPath(str string) (path, oldPath string) {
-	o := strings.Split(str, "->")
-	path = strings.TrimSpace(o[1])
-	oldPath = strings.TrimSpace(o[0])
-	return
+	return files
 }
