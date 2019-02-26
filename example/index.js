@@ -37,7 +37,6 @@ w.onAll((event, file) => {
 })
 w.onError(console.log)
 setTimeout(async () => {
-  console.log('ddd')
   let f = await w.getWatchedFiles()
   console.log(f)
 }, 5000)
