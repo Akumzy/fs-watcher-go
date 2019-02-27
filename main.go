@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,10 +36,17 @@ type fileInfo struct {
 type Config struct {
 	Filters           []watcher.Op `json:"filters"`
 	IgnoreHiddenFiles bool         `json:"ignoreHiddenFiles"`
-	IgnoreFiles       []string     `json:"ignoreFiles"`
+	IgnoreFiles       []string     `json:"ignorePaths"`
 	Interval          int64        `json:"interval"`
 	Path              string       `json:"path"`
 	Recursive         bool         `json:"recursive"`
+	FilterHooks       []filterHook `json:"filterHooks"`
+}
+
+// filterHook object expecting fron JavaScript
+type filterHook struct {
+	Reg         string `json:"reg"`
+	UseFullPath bool   `json:"useFullPath"`
 }
 
 var (
@@ -146,6 +154,7 @@ func main() {
 func startWatching(onReady func(watchedFiles []fileInfo)) {
 	w = watcher.New()
 	w.IgnoreHiddenFiles(config.IgnoreHiddenFiles)
+
 	if len(config.Filters) > 0 {
 		w.FilterOps(config.Filters...)
 	}
@@ -153,6 +162,15 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 	if len(config.IgnoreFiles) > 0 {
 		w.Ignore(config.IgnoreFiles...)
 	}
+	// Add Filter Hooks
+	go func() {
+		if len(config.FilterHooks) > 0 {
+			for _, val := range config.FilterHooks {
+				r := regexp.MustCompile(val.Reg)
+				w.AddFilterHook(watcher.RegexFilterHook(r, val.UseFullPath))
+			}
+		}
+	}()
 	if config.Path != "" {
 		if config.Recursive {
 			if err := w.AddRecursive(config.Path); err != nil {
