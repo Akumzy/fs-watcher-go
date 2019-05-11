@@ -190,6 +190,7 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 				if event.IsDir() && event.Op == watcher.Write {
 					continue
 				}
+
 				file := fileInfo{
 					Size:    event.Size(),
 					Path:    event.Path,
@@ -217,6 +218,7 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 	}()
 	files := getWatchedFiles()
 	onReady(files)
+
 	if err := w.Start(time.Millisecond * time.Duration(config.Interval)); err != nil {
 
 		reportError(err, true)

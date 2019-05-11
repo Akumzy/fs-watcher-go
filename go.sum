@@ -1,0 +1,4 @@
+github.com/Akumzy/ipc v0.0.0-20190428150754-76128748c1e5 h1:tiD/RAuIZlj2Dy8f5NUhNdBrH5M0F0xPPVVtU6Scug8=
+github.com/Akumzy/ipc v0.0.0-20190428150754-76128748c1e5/go.mod h1:KtE0oJxRkmbN0MyDlw/wULkL0ey21TF2SpDOfJ+sJUk=
+github.com/radovskyb/watcher v1.0.6 h1:8WIQ9UxEYMZjem1OwU7dVH94DXXk9mAIE1i8eqHD+IY=
+github.com/radovskyb/watcher v1.0.6/go.mod h1:78okwvY5wPdzcb1UYnip1pvrZNIVEIh/Cm+ZuvsUYIg=
