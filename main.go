@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
@@ -23,13 +25,15 @@ type appEvent struct {
 	Error interface{} `json:"error"`
 }
 type fileInfo struct {
-	Size    int64       `json:"size"`
-	ModTime time.Time   `json:"modTime"`
-	Path    string      `json:"path"`
-	Name    string      `json:"name"`
-	OldPath string      `json:"oldPath"`
-	IsDir   bool        `json:"isDir"`
-	Mode    os.FileMode `json:"chmod"`
+	Size    int64       `json:"size,omitempty"`
+	ModTime time.Time   `json:"modTime,omitempty"`
+	Path    string      `json:"path,omitempty"`
+	Name    string      `json:"name,omitempty"`
+	OldPath string      `json:"oldPath,omitempty"`
+	IsDir   bool        `json:"isDir,omitempty"`
+	Mode    os.FileMode `json:"chmod,omitempty"`
+	ID      string      `json:"id,omitempty"`
+	OldID   string      `json:"oldId,omitempty"`
 }
 
 // Config for the app
@@ -43,7 +47,7 @@ type Config struct {
 	FilterHooks       []filterHook `json:"filterHooks"`
 }
 
-// filterHook object expecting fron JavaScript
+// filterHook object expecting from JavaScript
 type filterHook struct {
 	Reg         string `json:"reg"`
 	UseFullPath bool   `json:"useFullPath"`
@@ -204,8 +208,11 @@ func startWatching(onReady func(watchedFiles []fileInfo)) {
 					file.OldPath = oldPath
 					file.Name = path.Base(newPath)
 				}
+				file.ID = genID(file.Path)
+				if file.OldPath != "" {
+					file.OldID = genID(file.OldPath)
+				}
 				ioIPC.Send("app:change", eventInfo{Event: event.Op, FileInfo: file})
-				log.Printf("%+v", event)
 			case err := <-w.Error:
 				ioIPC.Send("app:error", err)
 				log.Println(err)
@@ -246,8 +253,14 @@ func getWatchedFiles() []fileInfo {
 			Path:    key,
 			Name:    file.Name(),
 			ModTime: file.ModTime(),
+			ID:      genID(key),
 			Mode:    file.Mode(), IsDir: file.IsDir()}
 		files = append(files, item)
 	}
 	return files
+}
+
+func genID(filepath string) string {
+	hashByte := sha512.Sum512_224([]byte(filepath))
+	return hex.EncodeToString(hashByte[:])
 }

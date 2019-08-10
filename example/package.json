@@ -9,6 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@akumzy/fs-watcher": "0.1.8"
+    "@akumzy/fs-watcher": "^0.2.9"
   }
 }
