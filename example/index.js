@@ -1,7 +1,7 @@
 const { default: Watcher, Op } = require('@akumzy/fs-watcher');
 const { writeFileSync } = require('fs');
 const w = new Watcher({
-  binPath: '/home/akumzy/hola/fs-watcher-go/node-watcher',
+  binPath: '/home/akumzy/hola/fs-watcher-go/fs-watcher-go',
   path: '/home/akumzy/hola/fs-watcher-go', // path you'll like to watch
   debug: true,
   interval: 1000,

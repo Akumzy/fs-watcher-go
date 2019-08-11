@@ -1,4 +1,4 @@
-module github.com/Akumzy/node-watcher
+module github.com/Akumzy/fs-watcher-go
 
 go 1.12
 
